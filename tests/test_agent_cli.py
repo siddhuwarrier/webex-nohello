@@ -8,6 +8,7 @@ says must have no tools at all.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,15 @@ from webex_nohello.services.inference import InferenceError
 
 SYSTEM = "You classify messages."
 PROMPT = "Classify this."
+
+
+def installed(*executables: str) -> Callable[[str], bool]:
+    """State what is on PATH, so the suite does not depend on the developer's machine."""
+    return lambda name: name in executables
+
+
+BOTH = installed("claude", "codex")
+NEITHER = installed()
 
 
 def signed_in_codex(tmp_path: Path) -> Path:
@@ -41,30 +51,59 @@ class TestChoosingADriver:
         assert CHOICES == ("auto", "claude", "codex")
 
     def test_claude_can_be_chosen_explicitly(self) -> None:
-        assert isinstance(build_driver(preference="claude"), ClaudeDriver)
+        assert isinstance(build_driver(preference="claude", is_installed=BOTH), ClaudeDriver)
 
     def test_codex_can_be_chosen_explicitly(self) -> None:
-        assert isinstance(build_driver(preference="codex"), CodexDriver)
+        assert isinstance(build_driver(preference="codex", is_installed=BOTH), CodexDriver)
 
     def test_auto_prefers_claude_when_both_are_installed(self) -> None:
         """Not a judgement on the models: claude can be told to expose no tools directly."""
-        assert isinstance(build_driver(preference="auto"), ClaudeDriver)
+        assert isinstance(build_driver(preference="auto", is_installed=BOTH), ClaudeDriver)
+
+    def test_auto_falls_back_to_codex(self) -> None:
+        driver = build_driver(preference="auto", is_installed=installed("codex"))
+
+        assert isinstance(driver, CodexDriver)
+
+    def test_auto_with_neither_installed_says_how_to_install_both(self) -> None:
+        with pytest.raises(InferenceError) as caught:
+            build_driver(preference="auto", is_installed=NEITHER)
+
+        assert caught.value.remediation is not None
+        assert "claude" in caught.value.remediation.lower()
+        assert "codex" in caught.value.remediation.lower()
+
+    def test_choosing_one_that_is_not_installed_fails_immediately(self) -> None:
+        """Rather than on the first classification, halfway through a run."""
+        with pytest.raises(InferenceError) as caught:
+            build_driver(preference="codex", is_installed=installed("claude"))
+
+        assert "not on PATH" in caught.value.message
+
+    def test_the_missing_cli_error_mentions_the_scheduled_path(self) -> None:
+        """Because that is the case where it is least obvious what went wrong."""
+        with pytest.raises(InferenceError) as caught:
+            build_driver(preference="claude", is_installed=NEITHER)
+
+        assert caught.value.remediation is not None
+        assert "PATH" in caught.value.remediation
 
     def test_an_unknown_choice_is_refused_and_lists_the_valid_ones(self) -> None:
         with pytest.raises(InferenceError) as caught:
-            build_driver(preference="gemini")
+            build_driver(preference="gemini", is_installed=BOTH)
 
         assert caught.value.remediation is not None
         for choice in CHOICES:
             assert choice in caught.value.remediation
 
     def test_each_driver_reports_which_model_it_will_use(self) -> None:
-        assert "haiku" in build_driver(preference="claude").name
-        assert "gpt-5-mini" in build_driver(preference="codex", model="gpt-5-mini").name
+        assert "haiku" in build_driver(preference="claude", is_installed=BOTH).name
+        codex = build_driver(preference="codex", model="gpt-5-mini", is_installed=BOTH)
+        assert "gpt-5-mini" in codex.name
 
     def test_codex_says_default_model_when_none_is_configured(self) -> None:
         """This program will not guess at a model name it has not verified."""
-        assert "default model" in build_driver(preference="codex").name
+        assert "default model" in build_driver(preference="codex", is_installed=BOTH).name
 
 
 class TestCodexCommand:

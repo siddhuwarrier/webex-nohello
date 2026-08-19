@@ -12,6 +12,7 @@ Article IX.4's "no tools" is satisfied directly rather than by isolating a home 
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 
 from webex_nohello.services.claude_cli import ClaudeDriver
 from webex_nohello.services.codex_cli import CodexDriver
@@ -26,26 +27,36 @@ CLAUDE = "claude"
 CODEX = "codex"
 CHOICES = (AUTO, CLAUDE, CODEX)
 
+# Injectable so the suite can decide what is installed. Article XIII.8 requires the tests run
+# with no agent CLI present at all, which is exactly the case CI runs in and a developer
+# machine never does.
+type Availability = Callable[[str], bool]
+
+
+def _on_path(executable: str) -> bool:
+    return shutil.which(executable) is not None
+
 
 def build_driver(
     *,
     preference: str = AUTO,
     model: str | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    is_installed: Availability = _on_path,
 ) -> InferenceDriver:
     if preference == CLAUDE:
-        return _require(CLAUDE, ClaudeDriver(model=model, timeout=timeout))
+        return _require(CLAUDE, ClaudeDriver(model=model, timeout=timeout), is_installed)
     if preference == CODEX:
-        return _require(CODEX, CodexDriver(model=model, timeout=timeout))
+        return _require(CODEX, CodexDriver(model=model, timeout=timeout), is_installed)
     if preference != AUTO:
         raise InferenceError(
             f"Unknown classifier {preference!r}.",
             remediation=f"Choose one of: {', '.join(CHOICES)}.",
         )
 
-    if shutil.which(CLAUDE):
+    if is_installed(CLAUDE):
         return ClaudeDriver(model=model, timeout=timeout)
-    if shutil.which(CODEX):
+    if is_installed(CODEX):
         return CodexDriver(model=model, timeout=timeout)
 
     raise InferenceError(
@@ -57,9 +68,11 @@ def build_driver(
     )
 
 
-def _require(executable: str, driver: InferenceDriver) -> InferenceDriver:
+def _require(
+    executable: str, driver: InferenceDriver, is_installed: Availability
+) -> InferenceDriver:
     """Fail now, with a clear reason, rather than on the first classification."""
-    if shutil.which(executable):
+    if is_installed(executable):
         return driver
     raise InferenceError(
         f"'{executable}' was chosen as the classifier but is not on PATH.",
