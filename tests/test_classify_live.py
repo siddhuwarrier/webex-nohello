@@ -7,7 +7,7 @@ prompt still means what it says.
 
     uv run pytest -m live -v
 
-Article XIII.10 asks for this boundary to be pinned in both directions. The rows below are
+Article XIII.11 asks for this boundary to be pinned in both directions. The rows below are
 the cases that actually caught prompt problems, not a sample of easy ones.
 """
 

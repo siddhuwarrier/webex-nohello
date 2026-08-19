@@ -2,7 +2,7 @@
 
 The command is held as an absolute path with its arguments spelled out, because Article
 XIII.2 forbids depending on an inherited `PATH`, an activated virtualenv, or a shell
-profile — none of which a launchd or cron job has. Article XIII.4 additionally requires
+profile — none of which a launchd or cron job has. Article XIII.5 additionally requires
 `--commit` be visible, so that reading the installed plist or crontab line tells the truth
 about what it does.
 """
@@ -22,6 +22,11 @@ class SchedulePlan:
     interval: timedelta
     log_file: Path
     arguments: tuple[str, ...] = ("run", "--commit")
+    # The PATH the scheduled process gets. Not cosmetic: launchd leaves PATH unset, so a
+    # user agent falls back to a minimal system default that excludes ~/.local/bin. Naming
+    # our own executable absolutely is not enough, because the run then shells out to the
+    # classifier CLI and that lookup fails.
+    path_environment: str = ""
 
     @property
     def interval_minutes(self) -> int:

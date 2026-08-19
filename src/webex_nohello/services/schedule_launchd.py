@@ -52,6 +52,11 @@ class LaunchdScheduler:
     <array>
 {arguments}
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>{plan.path_environment}</string>
+    </dict>
     <key>StartInterval</key>
     <integer>{plan.interval_seconds}</integer>
     <key>RunAtLoad</key>

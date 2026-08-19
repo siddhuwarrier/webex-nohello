@@ -37,6 +37,7 @@ class CronScheduler:
         command = " ".join(plan.command)
         return (
             f"{CRON_BEGIN}\n"
+            f"PATH={plan.path_environment}\n"
             f"{_cron_expression(plan.interval_minutes)} "
             f"{command} >> {plan.log_file} 2>&1\n"
             f"{CRON_END}\n"

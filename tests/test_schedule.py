@@ -1,6 +1,6 @@
 """Schedulers: the exact artefact installed, and the cron arithmetic.
 
-Article XIII.12 asks for these verbatim. A scheduled job is the one thing nobody watches
+Article XIII.13 asks for these verbatim. A scheduled job is the one thing nobody watches
 fail, so a stray character in a plist or a wrong cron field would go unnoticed for days.
 """
 
@@ -25,6 +25,7 @@ PLAN = SchedulePlan(
     executable=Path("/opt/homebrew/bin/webex-nohello"),
     interval=timedelta(minutes=10),
     log_file=Path("/home/example/state/run.log"),
+    path_environment="/home/example/.local/bin:/usr/bin:/bin",
 )
 
 EXPECTED_PLIST = """\
@@ -41,6 +42,11 @@ EXPECTED_PLIST = """\
       <string>run</string>
       <string>--commit</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>PATH</key>
+      <string>/home/example/.local/bin:/usr/bin:/bin</string>
+    </dict>
     <key>StartInterval</key>
     <integer>600</integer>
     <key>RunAtLoad</key>
@@ -69,7 +75,7 @@ class TestLaunchdArtefact:
         assert "<string>/opt/homebrew/bin/webex-nohello</string>" in rendered
 
     def test_commit_is_visible_in_the_artefact(self, tmp_path: Path) -> None:
-        """Article XIII.4: reading the plist must tell the truth about what it does."""
+        """Article XIII.5: reading the plist must tell the truth about what it does."""
         assert "<string>--commit</string>" in LaunchdScheduler(tmp_path).render(PLAN)
 
     def test_it_does_not_run_at_load(self, tmp_path: Path) -> None:
@@ -88,6 +94,14 @@ class TestLaunchdArtefact:
         """StartInterval is seconds; minutes here would run 60 times too often."""
         assert "<integer>600</integer>" in LaunchdScheduler(tmp_path).render(PLAN)
 
+    def test_the_path_is_pinned_into_the_plist(self, tmp_path: Path) -> None:
+        """The bug this exists to prevent: launchd leaves PATH unset, so a scheduled run
+        could not find `claude` even though it worked perfectly from a shell."""
+        rendered = LaunchdScheduler(tmp_path).render(PLAN)
+
+        assert "<key>EnvironmentVariables</key>" in rendered
+        assert "<string>/home/example/.local/bin:/usr/bin:/bin</string>" in rendered
+
     def test_the_plist_location_is_the_user_agents_directory(self, tmp_path: Path) -> None:
         assert LaunchdScheduler(tmp_path).location == tmp_path / "local.webex-nohello.plist"
 
@@ -96,6 +110,7 @@ class TestCronArtefact:
     def test_the_block_is_exactly_this(self) -> None:
         expected = (
             f"{CRON_BEGIN}\n"
+            "PATH=/home/example/.local/bin:/usr/bin:/bin\n"
             "*/10 * * * * /opt/homebrew/bin/webex-nohello run --commit "
             ">> /home/example/state/run.log 2>&1\n"
             f"{CRON_END}\n"
@@ -108,6 +123,10 @@ class TestCronArtefact:
 
     def test_commit_is_visible(self) -> None:
         assert "run --commit" in CronScheduler().render(PLAN)
+
+    def test_the_path_is_pinned(self) -> None:
+        """cron's default PATH is minimal, so the classifier would not be found either."""
+        assert "PATH=/home/example/.local/bin:/usr/bin:/bin" in CronScheduler().render(PLAN)
 
 
 class TestCronExpression:

@@ -474,37 +474,56 @@ Downstream of the Preamble: a misfire is socially expensive and cannot be undone
 2. Generated entries MUST invoke the entrypoint by absolute path and MUST NOT
    depend on an inherited `PATH`, an activated virtualenv, or the operator's
    shell profile. This is the most common way scheduled jobs fail silently.
-3. `schedule install` arms something that posts for real. It MUST require
+
+   **This extends to every subprocess the run makes, not just the entrypoint.**
+   Naming our own executable absolutely was not enough: the run shells out to the
+   classifier CLI, `launchctl` leaves `PATH` unset for a user agent, and the minimal
+   default excludes `~/.local/bin` where both `claude` and a `uv tool install` land.
+   The result was a schedule that installed cleanly, passed preflight, worked
+   perfectly from a shell, and could not classify anything on a timer. The generated
+   artefact MUST therefore pin a `PATH` resolved at install time.
+
+   That `PATH` MUST NOT be built from symlink-resolved paths. `which claude` returns
+   `~/.local/bin/claude`, which is a symlink into a version-specific directory;
+   resolving it pins today's version and breaks silently the next time the tool
+   updates itself.
+3. Preflight passing in the operator's shell does not mean it will pass on a timer,
+   because the environments differ in exactly the way that breaks things. `schedule
+   install` MUST therefore run the command once itself, as a subprocess with the
+   pinned environment, and report the result. A scheduled-only failure discovered at
+   install time costs a minute; discovered later it costs however long until someone
+   reads the log.
+4. `schedule install` arms something that posts for real. It MUST require
    explicit confirmation, MUST display the exact command and interval it is
    about to install, and MUST refuse if preflight fails.
-4. The generated command MUST contain `--commit` explicitly and visibly, so that
+5. The generated command MUST contain `--commit` explicitly and visibly, so that
    reading the plist or crontab tells the truth about what it does.
-5. A laptop waking to many missed intervals MUST NOT produce a burst of replies;
+6. A laptop waking to many missed intervals MUST NOT produce a burst of replies;
    X.5 and X.9 together MUST make this safe.
-6. `schedule uninstall` MUST be complete and idempotent.
+7. `schedule uninstall` MUST be complete and idempotent.
 
 **Testing**
 
-7. The suite MUST run offline, with no network and no agent CLI installed.
-8. The Webex client MUST be tested against recorded HTTP fixtures, including
+8. The suite MUST run offline, with no network and no agent CLI installed.
+9. The Webex client MUST be tested against recorded HTTP fixtures, including
    429s, pagination, and truncated bodies.
-9. Classifier drivers MUST be tested against recorded CLI stdout fixtures,
+10. Classifier drivers MUST be tested against recorded CLI stdout fixtures,
    including malformed and truncated output.
-10. The classification boundary MUST have a table-driven suite of realistic
+11. The classification boundary MUST have a table-driven suite of realistic
     conversations pinning IX.6 in both directions.
-11. **Every rail in Article X MUST have a test that fails if the rail is
+12. **Every rail in Article X MUST have a test that fails if the rail is
     removed.** These matter more than any other test in the project.
-12. The generated launchd plist and crontab line MUST be asserted verbatim.
-13. Tests MUST NOT be written to satisfy coverage. There is no coverage target.
+13. The generated launchd plist and crontab line MUST be asserted verbatim.
+14. Tests MUST NOT be written to satisfy coverage. There is no coverage target.
 
 **Distribution**
 
-14. Published to PyPI, installed with `uv tool install webex-nohello` or
+15. Published to PyPI, installed with `uv tool install webex-nohello` or
     `pipx install webex-nohello`, which yields an isolated environment and a
     stable shim on `PATH` — the thing that makes XIII.2 achievable.
-15. Release MUST be one automated command producing a tagged, versioned
+16. Release MUST be one automated command producing a tagged, versioned
     artifact. Versioning is SemVer.
-16. The README MUST take an operator from zero to a working schedule, and MUST
+17. The README MUST take an operator from zero to a working schedule, and MUST
     state plainly and early that replies are sent from the operator's own
     account.
 
