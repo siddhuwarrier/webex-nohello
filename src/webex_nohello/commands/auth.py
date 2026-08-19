@@ -1,6 +1,6 @@
 """The `auth` command group: login, status, logout.
 
-Holds no business rules (Article III.4) and no wiring. It collects input, calls
+Holds no business rules (Article III.5) and no wiring. It collects input, calls
 `AuthService`, and renders the result.
 """
 

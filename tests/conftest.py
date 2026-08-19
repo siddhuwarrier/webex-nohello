@@ -27,8 +27,8 @@ from webex_nohello.models.webex.message import Message
 from webex_nohello.models.webex.person import Person
 from webex_nohello.models.webex.space import Space
 from webex_nohello.scopes import scope_parameter
-from webex_nohello.services.agent_cli import InferenceError
 from webex_nohello.services.auth import WebexGateway
+from webex_nohello.services.inference import InferenceError
 
 NOW = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
 FAKE_STATE = "state-abc123"

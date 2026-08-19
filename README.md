@@ -141,8 +141,32 @@ webex-nohello run --confidence 0.9       # require more certainty before a reply
 webex-nohello run --lookback-days 7      # re-examine a window you have already read
 ```
 
-Classification uses `claude --model haiku` with tools disabled and your MCP servers
-excluded, so it cannot reach Webex even in principle. Expect a few seconds per message.
+### Which CLI does the classifying
+
+Either `claude` or `codex`. `auto` (the default) uses `claude` when it is installed,
+otherwise `codex`:
+
+```sh
+webex-nohello run --classifier codex
+webex-nohello run --classifier claude --model haiku
+```
+
+Or set it permanently in `config.toml`:
+
+```toml
+classifier = "codex"
+# classifier_model = "gpt-5-mini"
+```
+
+`auto` prefers `claude` for a specific reason, not a view about the models. Article IX.4
+requires the classifier have no tools and no route to Webex. `claude` takes
+`--strict-mcp-config --allowedTools ""` and that is that. `codex` has no equivalent — its MCP
+servers come from *plugins*, and no config override reliably stops them loading, including a
+Webex MCP server if you have one — so it is instead pointed at an isolated `CODEX_HOME` under
+this program's state directory containing no config and a symlink to your credentials. That
+works, and is verified, but it is more machinery to go wrong.
+
+Either way, expect four to eight seconds per message.
 
 ## Judging the classifier against your own history
 

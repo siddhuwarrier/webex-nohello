@@ -1,6 +1,6 @@
 """The classifier's prompt.
 
-Kept in one place, as prose, so it can be reviewed as prose (Article III.5). The system
+Kept in one place, as prose, so it can be reviewed as prose (Article III.6). The system
 prompt is a byte-stable constant on purpose: the agent CLI caches on the prefix, so
 varying it would pay full price on every call.
 

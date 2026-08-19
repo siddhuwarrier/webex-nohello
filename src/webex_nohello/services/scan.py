@@ -61,7 +61,7 @@ class ScanProgress(Protocol):
 
     A scan makes one network request per space it opens, so on a slow link it can be
     quiet for a while. Reporting through a callback keeps the drawing in the command
-    layer, per Article III.4.
+    layer, per Article III.5.
     """
 
     def listing_spaces(self) -> None: ...

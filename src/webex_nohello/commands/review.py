@@ -16,18 +16,19 @@ from typing import Annotated
 
 import typer
 
-from webex_nohello import ui
+from webex_nohello import paths, ui
 from webex_nohello.clock import system_clock
 from webex_nohello.commands.progress import classification_progress, scan_progress
 from webex_nohello.models.classify.assessment import Assessment
 from webex_nohello.models.classify.verdict_kind import VerdictKind
 from webex_nohello.models.review.historical_candidate import HistoricalCandidate
-from webex_nohello.services.agent_cli import DEFAULT_MODEL, build_driver
+from webex_nohello.services.agent_cli import CHOICES, build_driver
 from webex_nohello.services.auth import build_auth_service
 from webex_nohello.services.classify import (
     DEFAULT_CONFIDENCE_THRESHOLD,
     ClassifierService,
 )
+from webex_nohello.services.config import load_settings
 from webex_nohello.services.review import (
     DEFAULT_MAX_MESSAGES,
     ReviewService,
@@ -48,7 +49,10 @@ def review(
     max_spaces: Annotated[
         int | None, typer.Option(help="Only look at this many spaces, most recently active first.")
     ] = None,
-    model: Annotated[str, typer.Option(help="Model for the classifier.")] = DEFAULT_MODEL,
+    classifier: Annotated[
+        str | None, typer.Option(help=f"Which CLI classifies: {', '.join(CHOICES)}.")
+    ] = None,
+    model: Annotated[str | None, typer.Option(help="Model for the classifier.")] = None,
     confidence: Annotated[
         float, typer.Option(help="Confidence at or above which a reply would be sent.")
     ] = DEFAULT_CONFIDENCE_THRESHOLD,
@@ -94,12 +98,19 @@ def review(
         ui.warn(f"Stopped at the --max-messages limit of {max_messages}; there may be more.")
     _confirm_spend(len(candidates), skip=yes)
 
-    classifier = ClassifierService(build_driver(model=model), confidence_threshold=confidence)
+    settings = load_settings(paths.config_file())
+    service = ClassifierService(
+        build_driver(
+            preference=classifier or settings.classifier,
+            model=model or settings.classifier_model,
+        ),
+        confidence_threshold=confidence,
+    )
     judged: list[tuple[HistoricalCandidate, Assessment]] = []
     with classification_progress(len(candidates)) as progress:
         for historical in candidates:
             progress.classifying(historical.candidate)
-            judged.append((historical, classifier.assess(historical.candidate, operator)))
+            judged.append((historical, service.assess(historical.candidate, operator)))
 
     _report(judged, confidence, timedelta(minutes=poll_minutes))
     if output_json is not None:

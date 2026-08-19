@@ -10,13 +10,14 @@ from typing import Annotated
 
 import typer
 
-from webex_nohello import ui
+from webex_nohello import paths, ui
 from webex_nohello.models.doctor.check import Check
 from webex_nohello.models.doctor.check_outcome import CheckOutcome
 from webex_nohello.models.doctor.health_report import HealthReport
 from webex_nohello.models.doctor.preflight_paths import PreflightPaths
 from webex_nohello.services.agent_cli import build_driver
 from webex_nohello.services.auth import build_auth_service
+from webex_nohello.services.config import load_settings
 from webex_nohello.services.doctor import DoctorService
 
 EXIT_FAILURE = 1
@@ -53,8 +54,14 @@ def doctor(
 
 
 def probe_inference() -> str:
-    """Prove the classifier is installed AND signed in, which only a real call can show."""
-    return build_driver().complete(PROBE_PROMPT, PROBE_SYSTEM)
+    """Prove the classifier is installed AND signed in, which only a real call can show.
+
+    Uses the configured CLI rather than whichever happens to be installed, so `doctor` checks
+    the one a run would actually use.
+    """
+    settings = load_settings(paths.config_file())
+    driver = build_driver(preference=settings.classifier, model=settings.classifier_model)
+    return f"{driver.name} answered: {driver.complete(PROBE_PROMPT, PROBE_SYSTEM)}"
 
 
 def _render(report: HealthReport) -> None:

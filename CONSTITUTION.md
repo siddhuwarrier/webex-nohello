@@ -103,16 +103,21 @@ used only where inference is genuinely required.**
 2. **Classification is delegated to a locally installed agent CLI** — `claude`
    or `codex` — invoked as a subprocess. Rationale: it reuses the operator's
    existing subscription authentication, so the program needs no LLM API key.
-3. The two agent CLIs MUST sit behind one narrow `Protocol` — a
-   `ClassifierDriver` — with a module per CLI. Nothing outside those modules may
-   know which CLI is in use, or contain the literal string `claude` or `codex`.
-4. Command pattern: one Typer command per module under `commands/`. A command
+3. The two agent CLIs MUST sit behind one narrow `Protocol` — `InferenceDriver` in
+   `services/inference.py` — with a module per CLI. Only `services/agent_cli.py`,
+   which chooses between them, may name both; nothing else may know which is in use.
+   Which one is used is an operator setting (`classifier`), defaulting to `auto`.
+4. `auto` MUST prefer `claude`. Not a judgement about the models: `claude` accepts
+   `--system-prompt` and `--strict-mcp-config`, so its context is a tenth the size and
+   Article IX.4 is satisfied by a flag. `codex` requires an isolated home directory to
+   achieve the same thing, which is more machinery and therefore more to go wrong.
+5. Command pattern: one Typer command per module under `commands/`. A command
    module validates input, calls into internal packages, and renders output. It
    MUST contain no Webex logic, no prompt text, and no business rules.
-5. Prompt text MUST live in a dedicated, reviewable prompt module or template
+6. Prompt text MUST live in a dedicated, reviewable prompt module or template
    file. It MUST NOT be inline in control flow or assembled by concatenation
    spread across functions.
-6. Layout — indicative in its naming, binding in its separation of concerns:
+7. Layout — indicative in its naming, binding in its separation of concerns:
    ```
    src/webex_nohello/
      cli.py                      # Typer app assembly, and errors -> exit codes
@@ -148,7 +153,7 @@ used only where inference is genuinely required.**
        config.py                 # loading and scaffolding settings
      commands/                   # one module per command group; input, call, render
    ```
-7. Every I/O boundary — HTTP, subprocess, filesystem, clock — MUST be injectable,
+8. Every I/O boundary — HTTP, subprocess, filesystem, clock — MUST be injectable,
    so Article XII can test with no network and no agent CLI installed.
 
 ## Article IV — Readability
@@ -361,8 +366,19 @@ particular client library. Therefore:
 3. The classifier MUST run on a small, cheap model — Claude Haiku by default,
    the equivalent small model for `codex`. The model identifier MUST be
    configurable.
-4. The classifier MUST be invoked with **no tools available**. It is text in,
-   JSON out. A classifier that can reach Webex is a defect, not a feature.
+4. The classifier MUST be invoked with **no tools available**. It is text in, JSON out.
+   A classifier that can reach Webex is a defect, not a feature.
+
+   How that is achieved differs per CLI and the difference is not cosmetic:
+   - `claude`: `--strict-mcp-config --allowedTools ""`.
+   - `codex`: an isolated `CODEX_HOME` under this program's state directory. codex takes
+     its MCP servers from *plugins* in `~/.codex/config.toml`, and `-c plugins={}`,
+     `-c features.plugins=false` and `-c mcp_servers={}` were each measured to leave them
+     loading regardless — including, on the machine this was written, the operator's own
+     Webex MCP server. A home with no config loads no plugins. The credentials are
+     symlinked into it and MUST NOT be copied: a second copy of an auth token on disk is
+     a worse problem than the one being solved. The home MUST be reused rather than
+     temporary, because a cold one costs about 17 seconds against 4 to 6 warm.
 5. The verdict MUST be schema-validated and MUST carry at least a verdict enum,
    a confidence in `[0, 1]`, and a one-sentence reason. The reason MUST be
    written to the audit log so a misfire can be explained after the fact.

@@ -81,7 +81,7 @@ class DoctorService:
             answer = self._probe_inference()
         except WebexNoHelloError as exc:
             return Check.failed("classifier", exc.message, exc.remediation or INSTALL_CLAUDE)
-        return Check.passed("classifier", f"answered: {answer.strip()[:60]}")
+        return Check.passed("classifier", answer.strip()[:90])
 
     def _check_webex(self) -> tuple[Check, ...]:
         """One live call, two findings: are the credentials sound, and does Webex accept them.

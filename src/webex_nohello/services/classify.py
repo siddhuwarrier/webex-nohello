@@ -19,12 +19,12 @@ from webex_nohello.models.classify.assessment import Assessment
 from webex_nohello.models.classify.verdict import Verdict
 from webex_nohello.models.run.candidate import Candidate
 from webex_nohello.models.webex.person import Person
-from webex_nohello.services.agent_cli import InferenceDriver, InferenceError
 from webex_nohello.services.classification_prompt import (
     SYSTEM_PROMPT,
     build_prompt,
     is_obviously_substantial,
 )
+from webex_nohello.services.inference import InferenceDriver, InferenceError
 
 # Article IX.8: ambiguity resolves to silence.
 DEFAULT_CONFIDENCE_THRESHOLD = 0.8

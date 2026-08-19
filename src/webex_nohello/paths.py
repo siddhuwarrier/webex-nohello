@@ -12,6 +12,7 @@ AUDIT_LOG_FILENAME = "replies.jsonl"
 LOCK_FILENAME = "run.lock"
 PAUSED_FILENAME = "PAUSED"
 RUN_LOG_FILENAME = "run.log"
+CODEX_HOME_DIRNAME = "codex-home"
 CONFIG_FILENAME = "config.toml"
 TEMPLATE_FILENAME = "reply.md"
 
@@ -45,6 +46,16 @@ def paused_file() -> Path:
 def run_log_file() -> Path:
     """Where a scheduled run's output goes. Nobody is watching the terminal for those."""
     return state_directory() / RUN_LOG_FILENAME
+
+
+def codex_home() -> Path:
+    """An isolated CODEX_HOME, so codex loads none of the operator's plugins.
+
+    See services/codex_cli.py: plugins are how codex acquires MCP servers, and there is no
+    flag to disable them. Reused rather than temporary, because a cold home costs about 17
+    seconds.
+    """
+    return state_directory() / CODEX_HOME_DIRNAME
 
 
 def config_file() -> Path:

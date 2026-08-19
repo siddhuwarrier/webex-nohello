@@ -5,7 +5,7 @@
 Every command that touches Webex goes through `require()` and nothing else.
 
 Side effects in `login()` are injected, so the flow is exercisable without a browser,
-a loopback socket, or a network (Article III.7).
+a loopback socket, or a network (Article III.8).
 """
 
 from __future__ import annotations
@@ -240,7 +240,7 @@ def _reject_non_human(person: Person) -> None:
 
 
 def build_auth_service() -> AuthService:
-    """Wire the real service graph. Kept out of the command modules per Article III.4."""
+    """Wire the real service graph. Kept out of the command modules per Article III.5."""
     return AuthService(
         store=KeyringCredentialStore(),
         oauth=OAuthService(system_clock),

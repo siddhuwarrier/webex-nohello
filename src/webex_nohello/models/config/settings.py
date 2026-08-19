@@ -11,6 +11,8 @@ discover the mistake.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Article X.3. Short on purpose. This is not "the point is made once, repeating it is
@@ -38,6 +40,13 @@ class Settings(BaseModel):
     cooldown_minutes: int = Field(default=DEFAULT_COOLDOWN_MINUTES, ge=0)
     max_replies_per_run: int = Field(default=DEFAULT_MAX_REPLIES_PER_RUN, ge=0)
     confidence_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+
+    # Which agent CLI classifies. "auto" prefers claude when both are installed, because it
+    # can be told to expose no tools directly; see services/agent_cli.py.
+    classifier: Literal["auto", "claude", "codex"] = "auto"
+    # Left unset, each CLI uses its own default: `haiku` for claude, and whatever codex is
+    # configured with. This program will not guess at a model name it has not verified.
+    classifier_model: str | None = None
 
     @model_validator(mode="before")
     @classmethod

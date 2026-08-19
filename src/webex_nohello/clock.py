@@ -1,4 +1,4 @@
-"""Injectable clock, so token expiry logic is testable without waiting (Article III.7)."""
+"""Injectable clock, so token expiry logic is testable without waiting (Article III.8)."""
 
 from __future__ import annotations
 

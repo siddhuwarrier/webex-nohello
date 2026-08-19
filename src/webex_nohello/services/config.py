@@ -51,6 +51,17 @@ max_replies_per_run = 5
 # sends fewer replies and misses more greetings; lowering it does the opposite. Anything
 # below about 0.7 starts replying to things that merely look like greetings.
 confidence_threshold = 0.8
+
+# Which agent CLI decides whether a message is a bare greeting: "auto", "claude" or "codex".
+#
+# "auto" uses claude when it is installed, otherwise codex. That preference is not a
+# judgement about the models: claude can be told directly to expose no tools, whereas codex
+# has to be pointed at an isolated home directory to achieve the same thing.
+classifier = "auto"
+
+# Which model that CLI should use. Leave it out to accept each CLI's own default -- `haiku`
+# for claude, and whatever your codex is configured with.
+# classifier_model = "haiku"
 """
 
 

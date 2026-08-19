@@ -21,7 +21,7 @@ from webex_nohello.models.config.settings import Settings
 from webex_nohello.models.run.candidate import Candidate
 from webex_nohello.models.run.scan_result import ScanResult
 from webex_nohello.models.webex.person import Person
-from webex_nohello.services.agent_cli import DEFAULT_MODEL, build_driver
+from webex_nohello.services.agent_cli import CHOICES, build_driver
 from webex_nohello.services.audit import FileAuditLog
 from webex_nohello.services.auth import build_auth_service
 from webex_nohello.services.classify import ClassifierService
@@ -60,7 +60,13 @@ def run(
         bool,
         typer.Option("--classify/--no-classify", help="Ask the classifier about each candidate."),
     ] = True,
-    model: Annotated[str, typer.Option(help="Model for the classifier.")] = DEFAULT_MODEL,
+    classifier: Annotated[
+        str | None,
+        typer.Option(help=f"Which CLI classifies: {', '.join(CHOICES)}. Overrides the config."),
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option(help="Model for the classifier. Overrides the config.")
+    ] = None,
     confidence: Annotated[
         float | None,
         typer.Option(help="Override confidence_threshold from the config for this run."),
@@ -97,6 +103,8 @@ def run(
         confidence=confidence,
         cooldown_minutes=cooldown_minutes,
         max_replies=max_replies,
+        classifier=classifier,
+        classifier_model=model,
     )
     template = load_template(paths.reply_template_file())
 
@@ -113,7 +121,6 @@ def run(
             context_messages=context_messages,
             lookback_days=lookback_days,
             classify=classify,
-            model=model,
             explain=explain,
             commit=commit,
         )
@@ -125,6 +132,8 @@ def _with_overrides(
     confidence: float | None,
     cooldown_minutes: int | None,
     max_replies: int | None,
+    classifier: str | None,
+    classifier_model: str | None,
 ) -> Settings:
     """Apply the per-run flags on top of the config file.
 
@@ -138,6 +147,8 @@ def _with_overrides(
             ("confidence_threshold", confidence),
             ("cooldown_minutes", cooldown_minutes),
             ("max_replies_per_run", max_replies),
+            ("classifier", classifier),
+            ("classifier_model", classifier_model),
         )
         if value is not None
     }
@@ -156,7 +167,6 @@ def _execute(
     context_messages: int,
     lookback_days: int | None,
     classify: bool,
-    model: str,
     explain: bool,
     commit: bool,
 ) -> None:
@@ -175,11 +185,11 @@ def _execute(
 
     assessments: list[Assessment] = []
     if classify and result.candidates and not result.is_first_run:
-        classifier = ClassifierService(
-            build_driver(model=model),
+        service = ClassifierService(
+            build_driver(preference=settings.classifier, model=settings.classifier_model),
             confidence_threshold=settings.confidence_threshold,
         )
-        assessments = _classify_and_report(classifier, result.candidates, operator, explain=explain)
+        assessments = _classify_and_report(service, result.candidates, operator, explain=explain)
     elif result.candidates and result.is_first_run:
         ui.blank()
         ui.warn("Skipping classification: a first run replies to nothing regardless.")

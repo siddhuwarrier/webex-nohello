@@ -66,6 +66,8 @@ def show() -> None:
     ui.line(f"  cooldown_minutes      {settings.cooldown_minutes}")
     ui.line(f"  max_replies_per_run   {settings.max_replies_per_run}")
     ui.line(f"  confidence_threshold  {settings.confidence_threshold}")
+    ui.line(f"  classifier            {settings.classifier}")
+    ui.line(f"  classifier_model      {settings.classifier_model or '(each CLI default)'}")
 
     ui.blank()
     if template_path.exists():
