@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/siddhuwarrier/webex-nohello/actions/workflows/ci.yml/badge.svg)](https://github.com/siddhuwarrier/webex-nohello/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/webex-nohello)](https://pypi.org/project/webex-nohello/)
-[![Python](https://img.shields.io/pypi/pyversions/webex-nohello)](https://pypi.org/project/webex-nohello/)
 [![Licence](https://img.shields.io/pypi/l/webex-nohello)](LICENSE)
 
 Replies to content-free Webex greetings with a polite nudge towards
@@ -433,7 +432,7 @@ Three gates before anything reaches PyPI:
 
 ## Status
 
-Implemented so far:
+Released on PyPI. Implemented so far:
 
 | Command | State |
 | --- | --- |
