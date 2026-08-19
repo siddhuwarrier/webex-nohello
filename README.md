@@ -14,6 +14,59 @@ trading hellos across timezones.
 The project is governed by [CONSTITUTION.md](CONSTITUTION.md). If you are
 changing the code, read that first.
 
+## Quickstart
+
+From nothing to a working schedule. **Every step but the last two is safe** — nothing is sent
+to anyone until you both name them in the config *and* pass `--commit`.
+
+```sh
+# 1. Install. Needs uv and Python 3.12+, plus `claude` or `codex` installed and signed in.
+git clone https://github.com/siddhuwarrier/webex-nohello
+cd webex-nohello
+uv tool install --editable .
+
+# 2. Sign in. Walks you through registering a Webex integration of your own -- a couple of
+#    minutes, once -- then stores the tokens in your keychain and writes a starter config.
+webex-nohello auth login
+
+# 3. Check that everything an unattended run depends on actually works.
+webex-nohello doctor
+
+# 4. Decide who may receive a reply. Until you do this, nothing is sent to anybody.
+webex-nohello config path
+#    Open the config.toml it prints, and add:
+#        allow_list = ["a-willing-colleague@example.com"]
+
+# 5. See what it would do. Sends nothing and does not move your read positions,
+#    so it is safe to run as often as you like.
+webex-nohello run
+
+# 6. Optional, and worth it: judge the classifier against a week of your real messages
+#    before trusting it. This one cannot send at all -- it has no such flag.
+webex-nohello review --lookback-days 7
+
+# 7. Send for real, once, while you are watching.
+webex-nohello run --commit
+
+# 8. Run it unattended, every 10 minutes. Prints the exact schedule it will install,
+#    refuses if preflight fails, asks, then runs once immediately so you see the result.
+webex-nohello schedule install
+```
+
+Afterwards:
+
+```sh
+webex-nohello schedule status    # installed? and has the system actually loaded it?
+webex-nohello config show        # which settings are in force, and where they came from
+tail -f ~/"Library/Application Support/webex-nohello/run.log"
+
+touch ~/"Library/Application Support/webex-nohello/PAUSED"   # stop, keeping the schedule
+webex-nohello schedule uninstall                             # stop, removing it
+```
+
+The rest of this file explains each of those in more detail. If you read only one other
+section, make it [Safety](#safety).
+
 ## Install
 
 ### Pre-requisites
