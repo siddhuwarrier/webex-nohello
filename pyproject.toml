@@ -1,0 +1,135 @@
+[project]
+name = "webex-nohello"
+version = "0.1.0"
+description = "Reply to content-free Webex greetings with a polite nudge towards nohello.net"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Siddhu Warrier" }]
+keywords = ["webex", "nohello", "cisco", "automation", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "typer>=0.12",           # command pattern, one module per command
+    "webexpythonsdk>=2.0.6", # official Webex SDK: transport, pagination, rate limiting
+    "pydantic>=2.7",         # typed boundaries, Article V
+    "keyring>=25.0",         # OS credential store, Article VIII.4
+    "platformdirs>=4.2",     # per-platform config and state locations
+]
+
+[project.urls]
+Homepage = "https://github.com/siddhuwarrier/webex-nohello"
+Repository = "https://github.com/siddhuwarrier/webex-nohello"
+Issues = "https://github.com/siddhuwarrier/webex-nohello/issues"
+
+[project.scripts]
+webex-nohello = "webex_nohello.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.10",
+    "ruff>=0.5",
+    "pytest>=8.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/webex_nohello"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+files = ["src", "tests", "scripts"]
+# The plugin gives models a real __init__ signature, so wrong constructor calls are
+# caught. disallow_any_explicit is deliberately NOT set: it flags every `class
+# X(BaseModel)` line, which would mean silencing it in every model module.
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "keyring.*"
+ignore_missing_imports = true
+
+# webexpythonsdk ships no py.typed and its signatures are unannotated. Accepted
+# deliberately: see the recorded deviation in Appendix A. Values crossing out of it are
+# validated into Pydantic models at the service boundary, so the Any stops there.
+[[tool.mypy.overrides]]
+module = "webexpythonsdk.*"
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# Enumerated explicitly. `select = ["ALL"]` is forbidden by Article II.8 because
+# its meaning changes silently when ruff adds rules.
+select = [
+    "A",   # flake8-builtins
+    "ARG", # unused arguments
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "C90", # mccabe complexity
+    "DTZ", # naive datetimes; token expiry maths must be tz-aware
+    "E",   # pycodestyle errors
+    "EM",  # exception messages must not be inline literals
+    "F",   # pyflakes
+    "I",   # import sorting
+    "N",   # pep8-naming
+    "PL",  # pylint, supplies PLR0911/12/13/15 required by Article II.8
+    "PTH", # use pathlib
+    "RET", # return simplification
+    "RUF",
+    "S",   # bandit
+    "SIM", # simplification
+    "T20", # no bare print; output goes through typer so it stays testable
+    "TRY", # exception antipatterns
+    "UP",  # pyupgrade
+    "W",   # pycodestyle warnings
+]
+ignore = [
+    # TRY003 forbids long messages at the raise site, and EM101/EM102 forbid literals
+    # and f-strings there at all. Both contradict Article IV.6, which requires errors to
+    # say what failed and what to do; honouring them would mean a throwaway local at
+    # every raise site purely to satisfy the linter.
+    "TRY003",
+    "EM101",
+    "EM102",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.per-file-ignores]
+# A Typer command's parameters are its command-line interface. Collapsing them to satisfy
+# an argument-count rule would hide options from --help, which is the opposite of useful.
+"src/webex_nohello/commands/*" = ["PLR0913", "PLR0917"]
+# S101 assert is the point of a test. PLR2004 magic values are clearer inline than
+# named. ARG002 unused arguments are unavoidable in fakes implementing a protocol.
+# S105/S106 flag the word "token" beside a literal, which every auth fixture contains.
+"tests/*" = ["S101", "S105", "S106", "S107", "PLR2004", "ARG002"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# conftest is imported by name for its builders, so tests/ must be on sys.path.
+pythonpath = ["tests"]
+# Article XIII.7: the default suite runs offline. The `live` tests call a real model, so
+# they cost money and are opted into with `-m live`.
+addopts = "-m 'not live'"
+markers = ["live: calls a real model; slow, costs money, needs claude signed in"]

@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So a dependency or CLI change is caught before someone hits it locally.
+  schedule:
+    - cron: "0 6 * * 1"
+
+# A force-push should not leave the old run burning minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    # The same four gates as pre-commit. Article II.10: if a commit passes locally and
+    # fails here, that is a bug in .pre-commit-config.yaml, not something to work around.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the floor the project claims; 3.13 catches what is coming.
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Type check
+        run: uv run mypy
+
+      - name: Test
+        # The suite is offline by design, so it needs no Webex credentials and no claude
+        # installed. The `live` tests are excluded by pyproject's addopts because they call
+        # a real model, which costs money and cannot run from CI.
+        run: uv run pytest -q
+
+      - name: Check module lengths
+        run: uv run python scripts/check_module_length.py $(git ls-files '*.py')
+
+  build:
+    # A wheel that does not build is a release that fails at the worst moment.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build the wheel and sdist
+        run: uv build
+
+      - name: Check the metadata renders on PyPI
+        run: uvx twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
