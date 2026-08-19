@@ -12,15 +12,14 @@ from pathlib import Path
 import pytest
 
 from webex_nohello.models.schedule.schedule_plan import SchedulePlan
-from webex_nohello.services.schedule import (
+from webex_nohello.services.schedule_cron import (
     CRON_BEGIN,
     CRON_END,
     CronScheduler,
-    LaunchdScheduler,
-    ScheduleError,
     _cron_expression,
     _without_managed_block,
 )
+from webex_nohello.services.schedule_launchd import LaunchdScheduler, ScheduleError
 
 PLAN = SchedulePlan(
     executable=Path("/opt/homebrew/bin/webex-nohello"),

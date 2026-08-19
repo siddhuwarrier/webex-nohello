@@ -77,6 +77,11 @@ def install(
             abort=True,
         )
 
+    # Created now, empty, so the `tail -f` below works straight away. Otherwise the file
+    # does not exist until the first run fires and the operator gets an error instead.
+    plan.log_file.parent.mkdir(parents=True, exist_ok=True)
+    plan.log_file.touch(exist_ok=True)
+
     scheduler.install(plan)
     ui.blank()
     ui.success(f"Scheduled. First run within {every_minutes} minutes.")
