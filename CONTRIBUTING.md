@@ -22,8 +22,11 @@ You do **not** need Webex credentials or `claude` installed to run the test suit
 offline by design.
 
 ```sh
-pre-commit install
+pre-commit install --hook-type pre-commit --hook-type commit-msg
 ```
+
+The second hook type checks your commit *messages*, which now decide the version — see
+[Commit messages decide the release](#commit-messages-decide-the-release).
 
 ## The gates
 
@@ -107,6 +110,43 @@ first was wrong in a way only a real run revealed.
 Amend it in the same pull request as the code, say which article changed and why, and record
 anything you learned about Webex or the SDK in Appendix A. What is *not* fine is quietly
 implementing around an article — the next person will read it and believe it.
+
+## Commit messages decide the release
+
+Pushing to `main` runs commitizen, which reads the commit subjects since the last tag,
+decides the version bump, tags it, and triggers a publish to PyPI. So the subject line is not
+just documentation — it is the release decision.
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Subject starts with | Effect |
+| --- | --- |
+| `fix: …` | patch — 0.2.0 to 0.2.1 |
+| `feat: …` | minor — 0.2.0 to 0.3.0 |
+| `feat!: …` or a `BREAKING CHANGE:` footer | minor while the major is 0; major after 1.0.0 |
+| `docs:`, `chore:`, `refactor:`, `test:`, `style:`, `ci:`, `perf:` | **no release** |
+
+That last row is the useful part: a README fix or a test tidy-up does not ship a version to
+PyPI. If nothing since the last tag has a releasing type, the bump workflow says so and stops.
+
+```
+feat: add codex as a second classifier
+
+Longer explanation goes here, in the same prose style as the rest of the history.
+Say what you changed and why, especially if it fixes something you hit in practice.
+```
+
+`pre-commit install --hook-type commit-msg` makes a malformed subject fail at the moment you
+write it, rather than silently producing no release days later. Worth doing:
+
+```sh
+pre-commit install --hook-type pre-commit --hook-type commit-msg
+```
+
+To be walked through it instead, `uv run cz commit` prompts for each part.
+
+Releasing 1.0.0 is deliberately not something a commit message can do: `major_version_zero`
+is set, so a breaking change bumps the minor until someone decides otherwise.
 
 ## Pull requests
 

@@ -32,3 +32,11 @@ repos:
         entry: uv run python scripts/check_module_length.py
         language: system
         types: [python]
+
+  # Rejects a commit message that commitizen could not read, at the point of writing it —
+  # rather than by silently producing no release days later.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.4.1
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]

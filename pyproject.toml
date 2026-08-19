@@ -41,6 +41,7 @@ dev = [
     "mypy>=1.10",
     "ruff>=0.5",
     "pytest>=8.2",
+    "commitizen>=3.29", # decides the version bump from conventional commit messages
 ]
 
 [build-system]
@@ -133,3 +134,16 @@ pythonpath = ["tests"]
 # they cost money and are opted into with `-m live`.
 addopts = "-m 'not live'"
 markers = ["live: calls a real model; slow, costs money, needs claude signed in"]
+
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+# Reads and writes `project.version` above, so the tag and the metadata cannot disagree —
+# which is what the release workflow refuses to publish on.
+version_provider = "pep621"
+tag_format = "v$version"
+update_changelog_on_bump = true
+changelog_incremental = true
+# While the major is 0, a breaking change bumps the minor rather than jumping to 1.0.0.
+# Releasing 1.0.0 should be a decision, not a side effect of one commit message.
+major_version_zero = true

@@ -1,0 +1,95 @@
+name: Bump
+
+# Decides the next version from the commit messages on main, tags it, and hands off to the
+# release workflow. Nothing here publishes; that is release.yml's job.
+#
+# A commit whose subject has no conventional-commit type produces no release at all, which is
+# deliberate: a README fix should not ship a new version to PyPI.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    # commitizen's own bump commit lands on main and would otherwise start this again. It
+    # would find nothing to bump and stop, but skipping outright is clearer than relying on
+    # that, and saves a pointless run.
+    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+    runs-on: ubuntu-latest
+    permissions:
+      # To push the bump commit and the tag.
+      contents: write
+      # To hand off to release.yml. A workflow_dispatch is one of the few events the
+      # GITHUB_TOKEN is allowed to trigger; a tag it pushes would start nothing.
+      actions: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # commitizen reads the log back to the previous tag to decide the bump, so a
+          # shallow clone would make it guess wrong.
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked --all-extras --dev
+
+      - name: Identify as the bot that is doing the committing
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Work out the next version
+        id: bump
+        run: |
+          set +e
+          uv run cz bump --yes --changelog
+          code=$?
+          set -e
+          # 21 is commitizen's "no eligible commits". Not a failure: it means the commits
+          # since the last tag were docs, chores or refactors, and nothing should be released.
+          if [ "$code" -eq 21 ]; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "Nothing to release: no conventional commits since the last tag."
+            exit 0
+          fi
+          if [ "$code" -ne 0 ]; then
+            echo "::error::cz bump failed with exit code $code"
+            exit "$code"
+          fi
+          version=$(uv run cz version --project)
+          echo "released=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Bumped to $version"
+
+      - name: Push the bump commit and its tag
+        if: steps.bump.outputs.released == 'true'
+        run: git push --follow-tags origin main
+
+      - name: Hand off to the release workflow
+        if: steps.bump.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Dispatched at the new tag rather than at main, so release.yml sees a tag ref and
+        # performs its tag-matches-version check instead of skipping it.
+        run: |
+          gh workflow run release.yml \
+            --ref "v${{ steps.bump.outputs.version }}" \
+            -f target=pypi
+
+      - name: Say what happened
+        run: |
+          if [ "${{ steps.bump.outputs.released }}" = "true" ]; then
+            echo "### Released v${{ steps.bump.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "release.yml is publishing it now." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### No release" >> "$GITHUB_STEP_SUMMARY"
+            echo "No conventional commits since the last tag, so nothing was bumped." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
