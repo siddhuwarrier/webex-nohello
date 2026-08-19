@@ -68,6 +68,16 @@ def build_driver(
     )
 
 
+def installed_classifiers(is_installed: Availability = _on_path) -> tuple[str, ...]:
+    """Which CLIs are present, in preference order.
+
+    Separate from `build_driver` because a caller sometimes wants to *report* the situation
+    rather than act on it — `auth login` says which will be used, and must not fail merely
+    because neither is installed yet.
+    """
+    return tuple(name for name in (CLAUDE, CODEX) if is_installed(name))
+
+
 def _require(
     executable: str, driver: InferenceDriver, is_installed: Availability
 ) -> InferenceDriver:

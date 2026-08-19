@@ -18,7 +18,9 @@ changing the code, read that first.
 
 ### Pre-requisites
 
-- Claude Code or Codex installed and accessible from $PATH in the environment.
+- **Claude Code or Codex** installed and on `$PATH`, signed in. One is enough; see
+  [Which CLI does the classifying](#which-cli-does-the-classifying) for the difference.
+- A Webex account. You will register a personal integration during `auth login`.
 
 ### From source
 
@@ -86,6 +88,52 @@ demand, and to extend the refresh token's 90-day window if the tool has sat unus
 If something else already owns the default callback port, use
 `auth login --port 9123` and set the same port in the integration's redirect URI.
 
+On success, `auth login` also writes a starter `config.toml` and tells you which CLI will be
+judging your messages.
+
+## Which CLI does the classifying
+
+Deciding whether a message is a bare greeting is the one part of this program that is not
+deterministic. Everything else — finding candidates, applying the safety rails, posting —
+is ordinary code. That judgement is delegated to a coding agent CLI you already have signed
+in, which is why no separate LLM API key is needed.
+
+Either `claude` or `codex` works. `auto`, the default, uses `claude` when it is installed and
+`codex` otherwise. `auth login` tells you which one it found.
+
+```sh
+webex-nohello run --classifier codex          # for one run
+```
+
+```toml
+classifier = "codex"                          # permanently, in config.toml
+# classifier_model = "gpt-5-mini"             # or leave out for each CLI's default
+```
+
+### Why `auto` prefers claude
+
+Not a view about the models. It is about Article IX.4, which requires the classifier have no
+tools and in particular no route to Webex — a classifier that could read or post messages
+itself would be a defect.
+
+- **`claude`** takes `--strict-mcp-config --allowedTools ""`, and that is the whole story. It
+  also accepts `--system-prompt`, which replaces Claude Code's own; without it a call ships
+  roughly 25,000 tokens of agent harness instead of 3,600.
+- **`codex`** has no equivalent. Its MCP servers come from *plugins* in
+  `~/.codex/config.toml`, and `-c plugins={}`, `-c features.plugins=false` and
+  `-c mcp_servers={}` were each measured to leave them loading anyway — including a Webex MCP
+  server, if you have one. So `codex` is instead pointed at an isolated `CODEX_HOME` under
+  this program's state directory, holding no config and a symlink to your real credentials.
+  No config means no plugins, which means no tools. Verified: no MCP server connects.
+
+  The credentials are symlinked, never copied — a second copy of an auth token on disk would
+  be a worse problem than the one being solved. The directory is reused rather than recreated
+  per call, because a cold one costs about 17 seconds against 4 to 6 warm.
+
+Both are correct on the same set of boundary cases, which live in `tests/test_classify_live.py`
+and include real conversations that previously caught misfires. Expect four to eight seconds
+per message either way.
+
 ## What access it asks for
 
 | Scope | Why it is needed |
@@ -140,33 +188,6 @@ webex-nohello run --no-classify          # scan only; makes no model calls
 webex-nohello run --confidence 0.9       # require more certainty before a reply counts
 webex-nohello run --lookback-days 7      # re-examine a window you have already read
 ```
-
-### Which CLI does the classifying
-
-Either `claude` or `codex`. `auto` (the default) uses `claude` when it is installed,
-otherwise `codex`:
-
-```sh
-webex-nohello run --classifier codex
-webex-nohello run --classifier claude --model haiku
-```
-
-Or set it permanently in `config.toml`:
-
-```toml
-classifier = "codex"
-# classifier_model = "gpt-5-mini"
-```
-
-`auto` prefers `claude` for a specific reason, not a view about the models. Article IX.4
-requires the classifier have no tools and no route to Webex. `claude` takes
-`--strict-mcp-config --allowedTools ""` and that is that. `codex` has no equivalent — its MCP
-servers come from *plugins*, and no config override reliably stops them loading, including a
-Webex MCP server if you have one — so it is instead pointed at an isolated `CODEX_HOME` under
-this program's state directory containing no config and a symlink to your credentials. That
-works, and is verified, but it is more machinery to go wrong.
-
-Either way, expect four to eight seconds per message.
 
 ## Judging the classifier against your own history
 
@@ -323,9 +344,10 @@ are deliberately timid:
 ## Requirements
 
 - Python 3.12 or newer.
-- `claude` or `codex` on your `PATH`, authenticated. This is used only to decide
-  whether a message is a bare greeting; keeping it as the inference path means you
-  do not need a separate LLM API key.
+- `claude` or `codex` on your `PATH`, authenticated — see
+  [Which CLI does the classifying](#which-cli-does-the-classifying). Used only to decide
+  whether a message is a bare greeting; reusing a CLI you already have signed in is why no
+  separate LLM API key is needed.
 
 Webex itself is reached over its REST API through the official
 [webexpythonsdk](https://pypi.org/project/webexpythonsdk/), not through an agent or

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import functools
 import webbrowser
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -22,10 +23,12 @@ from webex_nohello.models.auth.oauth_app import OAuthApp
 from webex_nohello.models.auth.refresh_outcome import RefreshOutcome
 from webex_nohello.models.webex.person import Person
 from webex_nohello.services import oauth
+from webex_nohello.services.agent_cli import build_driver, installed_classifiers
 from webex_nohello.services.auth import build_auth_service
 from webex_nohello.services.config import write_starter_config
 
 CALLBACK_TIMEOUT_SECONDS = 300.0
+ORDERED_ALTERNATIVE = {"claude": "codex", "codex": "claude"}
 EXIT_FAILURE = 1
 
 app = typer.Typer(help="Sign in to Webex, and inspect or revoke that sign-in.")
@@ -163,11 +166,49 @@ def _report_login_success(person: Person, port: int) -> None:
             "address to allow_list -- that is deliberate."
         )
 
+    _report_classifier(config_path)
+
     ui.blank()
     ui.line("Next:")
     ui.bullet("webex-nohello auth status      confirm the sign-in")
+    ui.bullet("webex-nohello doctor           check an unattended run would work")
     ui.bullet("webex-nohello run              see what it would do; sends nothing")
     ui.bullet(f"edit {config_path}")
+
+
+def _report_classifier(config_path: Path) -> None:
+    """Say which CLI will judge messages, and that it is a choice.
+
+    Worth saying here rather than leaving in the README: deciding whether a message is a bare
+    greeting is the one part of this program that is not deterministic, so the operator should
+    know which tool is making that call before it ever sends anything.
+    """
+    available = installed_classifiers()
+
+    ui.blank()
+    if not available:
+        ui.warn("Neither 'claude' nor 'codex' is installed, so nothing can be classified yet.")
+        ui.indented(
+            "Install one and sign in. Claude Code: "
+            "https://docs.claude.com/en/docs/claude-code -- Codex: "
+            "https://developers.openai.com/codex/cli"
+        )
+        return
+
+    chosen = build_driver(preference=available[0])
+    ui.success(f"Messages will be judged by {chosen.name}.")
+
+    if len(available) > 1:
+        ui.indented(
+            "Both claude and codex are installed. claude is preferred because it can be told "
+            "directly to expose no tools, so the classifier has no route to Webex; codex needs "
+            "an isolated home directory to achieve the same thing."
+        )
+        ui.indented('To switch, set classifier = "codex" in your config:')
+        # Not via `indented`, which wraps prose and would break a long path mid-word.
+        ui.line(f"       {config_path}")
+    else:
+        ui.indented(f"The other option is {ORDERED_ALTERNATIVE[available[0]]}, if you install it.")
 
 
 def _report_refresh(outcome: RefreshOutcome) -> None:

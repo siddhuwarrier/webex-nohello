@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from webex_nohello.services.agent_cli import CHOICES, build_driver
+from webex_nohello.services.agent_cli import CHOICES, build_driver, installed_classifiers
 from webex_nohello.services.claude_cli import ClaudeDriver
 from webex_nohello.services.codex_cli import AUTH_FILENAME, CodexDriver
 from webex_nohello.services.inference import InferenceError
@@ -104,6 +104,19 @@ class TestChoosingADriver:
     def test_codex_says_default_model_when_none_is_configured(self) -> None:
         """This program will not guess at a model name it has not verified."""
         assert "default model" in build_driver(preference="codex", is_installed=BOTH).name
+
+
+class TestReportingWhatIsInstalled:
+    """`auth login` says which CLI will judge messages, so it must not raise when none is."""
+
+    def test_both_are_listed_with_claude_first(self) -> None:
+        assert installed_classifiers(BOTH) == ("claude", "codex")
+
+    def test_only_what_is_present_is_listed(self) -> None:
+        assert installed_classifiers(installed("codex")) == ("codex",)
+
+    def test_neither_is_an_empty_tuple_rather_than_an_error(self) -> None:
+        assert installed_classifiers(NEITHER) == ()
 
 
 class TestCodexCommand:
