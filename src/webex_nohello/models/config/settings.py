@@ -11,9 +11,10 @@ discover the mistake.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Article X.3. Short on purpose. This is not "the point is made once, repeating it is
 # nagging" — someone who keeps sending content-free greetings keeps earning the nudge. The
@@ -47,6 +48,23 @@ class Settings(BaseModel):
     # Left unset, each CLI uses its own default: `haiku` for claude, and whatever codex is
     # configured with. This program will not guess at a model name it has not verified.
     classifier_model: str | None = None
+
+    # Article XI.3. The reply is prose, so it lives in a Markdown file rather than being
+    # wedged into TOML. Unset means reply.md beside this config file; naming a file here is
+    # how an operator keeps their wording somewhere they already look, such as a notes repo.
+    # A relative path is relative to the config file's own directory.
+    reply_file: Path | None = None
+
+    # Before coercion, because Path("") is Path("."), and silently reading the config
+    # directory as if it were a file is a confusing way to learn the value was blank.
+    @field_validator("reply_file", mode="before")
+    @classmethod
+    def _reply_file_must_name_something(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            raise ValueError(
+                "reply_file is empty. Remove the key to use reply.md beside the config file."
+            )
+        return value
 
     @model_validator(mode="before")
     @classmethod

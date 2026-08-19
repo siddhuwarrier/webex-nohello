@@ -147,7 +147,7 @@ used only where inference is genuinely required.**
        dispatch.py               # every rail in Article X, and the send
        audit.py                  # append-only log; the source of cooldowns
        lock.py                   # run lock and kill switch
-       reply_template.py         # the reply text and its placeholders
+       reply_template.py         # where the reply text is read from, and rendering
        state.py                  # high-water marks, atomically
        review.py                 # collecting history to judge the classifier
        config.py                 # loading and scaffolding settings
@@ -446,13 +446,28 @@ Downstream of the Preamble: a misfire is socially expensive and cannot be undone
    directory. The program MUST work with no config file by using safe defaults,
    except that it MUST NOT invent an opt-in list.
 2. `config init` MUST write a commented file whose defaults are safe.
-3. The reply text MUST be operator-configurable as a template file. The shipped
+3. The reply text MUST be operator-configurable as a Markdown file, not as a
+   value in the TOML. It is prose, and prose belongs in a file that can be
+   edited, diffed and kept with the operator's own notes. The default location is
+   `reply.md` beside the config file; `reply_file` MAY name another, and a
+   relative path MUST be resolved against the config file's own directory rather
+   than the working directory, so that a config remains portable. The shipped
    default is Appendix B.
 4. Template rendering MUST fail loudly on an unknown placeholder rather than
    render it blank or literal.
 5. Config MUST be validated at startup, and the program MUST refuse to run with a
    message naming the offending key, rather than starting with a silently coerced
    value.
+6. A `reply_file` that names a file which does not exist MUST be an error. An
+   absent file at the *default* location means the operator has not written their
+   own yet, so Appendix B stands; an absent file they *named* means they intended
+   their own words, and sending the shipped text instead would put words in their
+   mouth they did not write.
+7. Every command that reports on configuration — `config show`, `config path`,
+   `config reply`, `doctor`, and `run` when it is about to send — MUST name the
+   file the reply text is read from. "Why did it send that wording?" is in
+   practice a question about which file to open, and an operator editing one
+   `reply.md` while `reply_file` points at another has no other way to find out.
 
 ## Article XII — Preflight
 

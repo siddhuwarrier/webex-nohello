@@ -26,7 +26,7 @@ from webex_nohello.models.errors.webex_nohello_error import WebexNoHelloError
 from webex_nohello.models.webex.person import Person
 from webex_nohello.services.config import load_settings
 from webex_nohello.services.lock import is_paused
-from webex_nohello.services.reply_template import load_template, render
+from webex_nohello.services.reply_template import load_reply, render
 from webex_nohello.services.state import FileStateStore
 
 INSTALL_CLAUDE = "Install Claude Code and sign in: https://docs.claude.com/en/docs/claude-code"
@@ -56,7 +56,7 @@ class DoctorService:
                 self._check_classifier(),
                 *self._check_webex(),
                 self._check_config(),
-                self._check_template(),
+                self._check_reply_text(settings),
                 self._check_state_directory(),
                 *(() if settings is None else (self._check_anything_can_be_sent(settings),)),
             )
@@ -142,16 +142,28 @@ class DoctorService:
             f"cap {settings.max_replies_per_run}/run, confidence {settings.confidence_threshold}",
         )
 
-    def _check_template(self) -> Check:
-        """Rendered, not merely loaded: an unknown placeholder only fails at render time."""
-        try:
-            rendered = render(load_template(self._paths.reply_template), _EXAMPLE_SENDER)
-        except WebexNoHelloError as exc:
-            return Check.failed(
-                "reply text", exc.message, exc.remediation or "Correct the template."
+    def _check_reply_text(self, settings: Settings | None) -> Check:
+        """Rendered, not merely read: an unknown placeholder only fails at render time.
+
+        Names the file either way. The commonest confusion this can clear up is an operator
+        editing one reply.md while `reply_file` points at another.
+        """
+        if settings is None:
+            return Check.warned(
+                "reply text",
+                "not checked: the config could not be read",
+                "Fix the config first; it says which file the reply text is in.",
             )
 
-        where = "custom file" if self._paths.reply_template.exists() else "built-in default"
+        try:
+            source = load_reply(settings.reply_file, default_path=self._paths.reply_template)
+            rendered = render(source.text, _EXAMPLE_SENDER)
+        except WebexNoHelloError as exc:
+            return Check.failed(
+                "reply text", exc.message, exc.remediation or "Correct the reply text."
+            )
+
+        where = source.path if source.is_customised else f"built-in default (no {source.path})"
         return Check.passed("reply text", f"{where}; renders to {len(rendered)} characters")
 
     def _check_state_directory(self) -> Check:

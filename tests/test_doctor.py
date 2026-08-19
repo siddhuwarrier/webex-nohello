@@ -191,6 +191,22 @@ class TestConfigAndTemplate:
 
         assert find(examine(tmp_path), "reply text").outcome is CheckOutcome.PASSED
 
+    def test_the_file_in_force_is_named(self, tmp_path: Path) -> None:
+        """The point of the check: the operator can tell which file is actually read."""
+        (tmp_path / "config.toml").write_text('reply_file = "mine.md"\n', encoding="utf-8")
+        (tmp_path / "mine.md").write_text("Hi {sender_first_name}\n", encoding="utf-8")
+
+        assert "mine.md" in find(examine(tmp_path), "reply text").detail
+
+    def test_a_configured_file_that_is_missing_fails(self, tmp_path: Path) -> None:
+        """Falling back to the default would send wording the operator never wrote."""
+        (tmp_path / "config.toml").write_text('reply_file = "gone.md"\n', encoding="utf-8")
+
+        report = examine(tmp_path)
+
+        assert not report.is_healthy
+        assert "gone.md" in find(report, "reply text").detail
+
 
 class TestStateDirectory:
     def test_a_writable_directory_passes(self, tmp_path: Path) -> None:

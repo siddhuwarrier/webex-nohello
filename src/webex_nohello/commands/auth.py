@@ -173,6 +173,7 @@ def _report_login_success(person: Person, port: int) -> None:
     ui.bullet("webex-nohello auth status      confirm the sign-in")
     ui.bullet("webex-nohello doctor           check an unattended run would work")
     ui.bullet("webex-nohello run              see what it would do; sends nothing")
+    ui.bullet("webex-nohello config reply     read the wording it would send, and where from")
     ui.bullet(f"edit {config_path}")
 
 

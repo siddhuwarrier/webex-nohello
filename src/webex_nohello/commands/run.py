@@ -18,6 +18,7 @@ from webex_nohello.commands import run_report
 from webex_nohello.commands.progress import classification_progress, scan_progress
 from webex_nohello.models.classify.assessment import Assessment
 from webex_nohello.models.config.settings import Settings
+from webex_nohello.models.reply.reply_source import ReplySource
 from webex_nohello.models.run.candidate import Candidate
 from webex_nohello.models.run.scan_result import ScanResult
 from webex_nohello.models.webex.person import Person
@@ -28,7 +29,7 @@ from webex_nohello.services.classify import ClassifierService
 from webex_nohello.services.config import load_settings
 from webex_nohello.services.dispatch import DispatchService
 from webex_nohello.services.lock import is_paused, run_lock
-from webex_nohello.services.reply_template import load_template
+from webex_nohello.services.reply_template import load_reply
 from webex_nohello.services.scan import (
     DEFAULT_CONTEXT_MESSAGES,
     ScanService,
@@ -106,7 +107,7 @@ def run(
         classifier=classifier,
         classifier_model=model,
     )
-    template = load_template(paths.reply_template_file())
+    reply = load_reply(settings.reply_file, default_path=paths.reply_template_file())
 
     # Marks where this run begins in the log. Does nothing interactively.
     ui.run_separator("run --commit" if commit else "run (dry)")
@@ -119,7 +120,7 @@ def run(
     with run_lock(paths.lock_file()):
         _execute(
             settings=settings,
-            template=template,
+            reply=reply,
             max_spaces=max_spaces,
             context_messages=context_messages,
             lookback_days=lookback_days,
@@ -165,7 +166,7 @@ def _with_overrides(
 def _execute(
     *,
     settings: Settings,
-    template: str,
+    reply: ReplySource,
     max_spaces: int | None,
     context_messages: int,
     lookback_days: int | None,
@@ -198,12 +199,16 @@ def _execute(
         ui.warn("Skipping classification: a first run replies to nothing regardless.")
 
     if assessments:
+        # Named on the way past, because "why did it send that wording?" is really a
+        # question about which file to open.
+        ui.blank()
+        ui.line(f"Reply text from {reply.path}" if reply.is_customised else "Reply text: default")
         dispatcher = DispatchService(
             reader,
             FileAuditLog(paths.audit_log_file()),
             settings,
             system_clock,
-            template=template,
+            template=reply.text,
         )
         _dispatch_and_report(dispatcher, assessments, settings, commit=commit)
 

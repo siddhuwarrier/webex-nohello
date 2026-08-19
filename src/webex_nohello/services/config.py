@@ -62,6 +62,21 @@ classifier = "auto"
 # Which model that CLI should use. Leave it out to accept each CLI's own default -- `haiku`
 # for claude, and whatever your codex is configured with.
 # classifier_model = "haiku"
+
+# Which file holds the message that gets sent.
+#
+# The reply is prose, so it lives in a Markdown file rather than in here. Leave this out and
+# it is read from reply.md beside this file -- and if that does not exist either, the
+# built-in default is sent. Point it somewhere else to keep your wording with your own
+# notes; a relative path is relative to this file's directory, and ~ works.
+#
+#   webex-nohello config reply       shows the text in force and which file it came from
+#   webex-nohello config template    writes the default into that file so you can edit it
+#
+# Three placeholders are available: {sender_first_name}, {sender_display_name} and
+# {sender_email}. Anything else in braces is an error rather than being sent literally.
+#
+# reply_file = "reply.md"
 """
 
 

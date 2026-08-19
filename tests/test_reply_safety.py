@@ -20,7 +20,7 @@ from webex_nohello.models.config.settings import DEFAULT_COOLDOWN_MINUTES
 from webex_nohello.models.errors.webex_nohello_error import WebexNoHelloError
 from webex_nohello.services.audit import FileAuditLog, is_in_cooldown
 from webex_nohello.services.lock import AlreadyRunningError, is_paused, run_lock
-from webex_nohello.services.reply_template import DEFAULT_TEMPLATE, load_template, render
+from webex_nohello.services.reply_template import DEFAULT_TEMPLATE, load_reply, locate, render
 
 SUBPROCESS_TIMEOUT = 30
 
@@ -188,19 +188,70 @@ class TestKillSwitch:
         assert is_paused(marker)
 
 
+class TestWhereTheReplyComesFrom:
+    """Article XI.3. The operator must be able to see which file is in force."""
+
+    def test_the_default_location_is_beside_the_config(self, tmp_path: Path) -> None:
+        default = tmp_path / "reply.md"
+
+        assert locate(None, default_path=default) == default
+
+    def test_a_relative_path_is_relative_to_the_config_file(self, tmp_path: Path) -> None:
+        """Otherwise a config could not be copied between machines."""
+        resolved = locate(Path("prose/mine.md"), default_path=tmp_path / "reply.md")
+
+        assert resolved == tmp_path / "prose" / "mine.md"
+
+    def test_an_absolute_path_is_taken_as_given(self, tmp_path: Path) -> None:
+        elsewhere = tmp_path / "elsewhere" / "mine.md"
+
+        assert locate(elsewhere, default_path=tmp_path / "reply.md") == elsewhere
+
+    def test_a_tilde_is_expanded(self, tmp_path: Path) -> None:
+        resolved = locate(Path("~/mine.md"), default_path=tmp_path / "reply.md")
+
+        assert resolved == Path.home() / "mine.md"
+
+
 class TestReplyTemplate:
     def test_the_default_is_used_when_no_file_exists(self, tmp_path: Path) -> None:
-        assert load_template(tmp_path / "absent.md") == DEFAULT_TEMPLATE
+        source = load_reply(None, default_path=tmp_path / "reply.md")
+
+        assert source.text == DEFAULT_TEMPLATE
+        assert not source.is_customised
+        # Named even though it is absent: it is the file to create to change the wording.
+        assert source.path == tmp_path / "reply.md"
 
     def test_the_default_says_what_it_needs_to(self) -> None:
         assert "nohello.net" in DEFAULT_TEMPLATE
         assert "Automated reply" in DEFAULT_TEMPLATE
 
-    def test_an_operators_file_replaces_the_default(self, tmp_path: Path) -> None:
+    def test_a_file_at_the_default_location_replaces_the_default(self, tmp_path: Path) -> None:
         path = tmp_path / "reply.md"
         path.write_text("my own wording", encoding="utf-8")
 
-        assert load_template(path) == "my own wording"
+        source = load_reply(None, default_path=path)
+
+        assert source.text == "my own wording"
+        assert source.is_customised
+        assert source.path == path
+
+    def test_a_configured_file_is_read_and_named(self, tmp_path: Path) -> None:
+        mine = tmp_path / "prose" / "mine.md"
+        mine.parent.mkdir()
+        mine.write_text("from my notes", encoding="utf-8")
+
+        source = load_reply(Path("prose/mine.md"), default_path=tmp_path / "reply.md")
+
+        assert source.text == "from my notes"
+        assert source.path == mine
+
+    def test_a_configured_file_that_is_missing_is_refused(self, tmp_path: Path) -> None:
+        """Sending the built-in default instead would put words in the operator's mouth."""
+        with pytest.raises(WebexNoHelloError) as caught:
+            load_reply(Path("gone.md"), default_path=tmp_path / "reply.md")
+
+        assert "gone.md" in caught.value.message
 
     def test_an_empty_file_is_refused(self, tmp_path: Path) -> None:
         """Rendering nothing would post an empty message, which is worse than not posting."""
@@ -208,7 +259,7 @@ class TestReplyTemplate:
         path.write_text("   \n", encoding="utf-8")
 
         with pytest.raises(WebexNoHelloError):
-            load_template(path)
+            load_reply(None, default_path=path)
 
     def test_the_default_renders_unchanged(self) -> None:
         sender = make_person(display_name="Ada Lovelace", email="ada@example.com")

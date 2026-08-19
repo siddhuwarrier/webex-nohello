@@ -63,4 +63,5 @@ def config_file() -> Path:
 
 
 def reply_template_file() -> Path:
+    """Where the reply text lives unless `reply_file` in the config points elsewhere."""
     return config_directory() / TEMPLATE_FILENAME

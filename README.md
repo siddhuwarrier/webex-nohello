@@ -39,18 +39,21 @@ webex-nohello config path
 #    Open the config.toml it prints, and add:
 #        allow_list = ["a-willing-colleague@example.com"]
 
-# 5. See what it would do. Sends nothing and does not move your read positions,
+# 5. Read the wording it would send, and which file to edit to change it.
+webex-nohello config reply
+
+# 6. See what it would do. Sends nothing and does not move your read positions,
 #    so it is safe to run as often as you like.
 webex-nohello run
 
-# 6. Optional, and worth it: judge the classifier against a week of your real messages
+# 7. Optional, and worth it: judge the classifier against a week of your real messages
 #    before trusting it. This one cannot send at all -- it has no such flag.
 webex-nohello review --lookback-days 7
 
-# 7. Send for real, once, while you are watching.
+# 8. Send for real, once, while you are watching.
 webex-nohello run --commit
 
-# 8. Run it unattended, every 10 minutes. Prints the exact schedule it will install,
+# 9. Run it unattended, every 10 minutes. Prints the exact schedule it will install,
 #    refuses if preflight fails, asks, then runs once immediately so you see the result.
 webex-nohello schedule install
 ```
@@ -271,14 +274,28 @@ The only line you need to change to start replying:
 allow_list = ["a-willing-colleague@example.com"]
 ```
 
-The rest — `opt_in_only`, `deny_list`, `cooldown_days`, `max_replies_per_run`,
+The rest — `opt_in_only`, `deny_list`, `cooldown_minutes`, `max_replies_per_run`,
 `confidence_threshold` — are documented inline in the file itself at their defaults.
 
-To change the wording:
+### The wording it sends
+
+The reply is prose, so it lives in a Markdown file rather than in the TOML. By default that
+is `reply.md` beside your `config.toml`, and until you write one the built-in text is sent.
 
 ```sh
-webex-nohello config template     # writes reply.md for you to edit
+webex-nohello config reply        # the text in force, and which file it came from
+webex-nohello config template     # writes the default into that file so you can edit it
 ```
+
+To keep your wording somewhere you already look — a notes repo, a dotfiles directory — point
+`config.toml` at it. A relative path is relative to the config file, and `~` works:
+
+```toml
+reply_file = "~/notes/webex-nohello-reply.md"
+```
+
+If `reply_file` names a file that is not there, the run stops and says so. It will not fall
+back to the built-in text, because that would send wording you never wrote.
 
 Placeholders `{sender_first_name}`, `{sender_display_name}` and `{sender_email}` are
 available; anything else is an error rather than rendering blank.
@@ -369,7 +386,7 @@ are deliberately timid:
 - On its very first run the program replies to nothing at all. It records where
   it has read up to and tells you what it would have considered, so it cannot
   work backwards through a year of history.
-- One person gets at most one reply per cooldown window (30 days by default).
+- One person gets at most one reply per cooldown window (30 minutes by default).
 - There is a cap on replies per run. Wanting to exceed it is treated as a fault
   and stops the run rather than proceeding.
 - Anything the classifier is not confident about is left alone.
@@ -410,16 +427,26 @@ the pull request, per Article II.11.
 
 ## Releasing
 
-Tag it, and GitHub Actions does the rest via
-[trusted publishing](https://docs.pypi.org/trusted-publishers/) — there is no API token
-stored anywhere.
+Releases are automatic. Push to `main` and commitizen reads the commit subjects since the
+last tag, works out the version, tags it, and hands off to a workflow that publishes to PyPI
+via [trusted publishing](https://docs.pypi.org/trusted-publishers/) — no API token is stored
+anywhere.
+
+Which means the commit subject is the release decision:
+
+| Subject | Result |
+| --- | --- |
+| `fix: …` | patch release |
+| `feat: …` | minor release |
+| `docs:`, `chore:`, `refactor:`, `test:`, `ci:` | no release |
+
+A commit with no conventional type publishes nothing, which is the point: a README fix
+should not ship a version.
+
+To release by hand instead — or to re-run a failed publish:
 
 ```sh
-# rehearse against TestPyPI first
-gh workflow run release.yml -f target=testpypi
-
-# release
-git tag v0.2.0 && git push origin v0.2.0
+git tag v0.3.0 && git push origin v0.3.0
 ```
 
 Three gates before anything reaches PyPI:
