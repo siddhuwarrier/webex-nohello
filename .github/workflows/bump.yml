@@ -70,7 +70,12 @@ jobs:
 
       - name: Push the bump commit and its tag
         if: steps.bump.outputs.released == 'true'
-        run: git push --follow-tags origin main
+        # The tag is pushed by name rather than with --follow-tags. That flag only pushes
+        # annotated tags, and it silently succeeds when there is nothing to push — so a
+        # lightweight tag stays local while the step goes green and the release never runs.
+        run: |
+          git push origin main
+          git push origin "v${{ steps.bump.outputs.version }}"
 
       - name: Hand off to the release workflow
         if: steps.bump.outputs.released == 'true'

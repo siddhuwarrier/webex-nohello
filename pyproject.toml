@@ -142,6 +142,9 @@ name = "cz_conventional_commits"
 # which is what the release workflow refuses to publish on.
 version_provider = "pep621"
 tag_format = "v$version"
+# Annotated, so `git show v0.3.0` says who tagged it and when, and so the tag survives
+# tooling that only handles annotated tags.
+annotated_tag = true
 update_changelog_on_bump = true
 changelog_incremental = true
 # While the major is 0, a breaking change bumps the minor rather than jumping to 1.0.0.
