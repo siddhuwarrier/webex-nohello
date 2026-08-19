@@ -1,6 +1,6 @@
 [project]
 name = "webex-nohello"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reply to content-free Webex greetings with a polite nudge towards nohello.net"
 readme = "README.md"
 requires-python = ">=3.12"
