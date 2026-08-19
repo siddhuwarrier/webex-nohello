@@ -57,9 +57,10 @@ jobs:
           uv run cz bump --yes --changelog --files-only
           code=$?
           set -e
-          # 21 is commitizen's "no eligible commits". Not a failure: it means the commits
-          # since the last tag were docs, chores or refactors, and nothing should be released.
-          if [ "$code" -eq 21 ]; then
+          # Two ways for there to be nothing to release, and neither is a failure: 21 is
+          # "commits exist but none of them bump the version" — docs, chores, refactors —
+          # and 3 is "no commits at all since the tag". Every other non-zero code is real.
+          if [ "$code" -eq 21 ] || [ "$code" -eq 3 ]; then
             echo "released=false" >> "$GITHUB_OUTPUT"
             echo "Nothing to release: no conventional commits since the last tag."
             exit 0
@@ -87,8 +88,10 @@ jobs:
           git add pyproject.toml uv.lock CHANGELOG.md
           git commit -m "bump: version $PREVIOUS → $VERSION"
           git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin main
-          git push origin "v$VERSION"
+          # --atomic: both refs or neither. A pushed commit without its tag leaves main
+          # claiming a version that was never released, and CHANGELOG.md then names a
+          # version with no tag — which cz refuses to write an incremental changelog against.
+          git push --atomic origin main "v$VERSION"
 
       - name: Hand off to the release workflow
         if: steps.bump.outputs.released == 'true'
