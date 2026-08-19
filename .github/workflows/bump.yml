@@ -47,9 +47,14 @@ jobs:
 
       - name: Work out the next version
         id: bump
+        # --files-only, so commitizen decides the version and writes the files but does not
+        # commit or tag. The lockfile records the project's own version and has to be
+        # refreshed in the same commit, or every later `uv sync --locked` fails on a
+        # lockfile that disagrees with pyproject.toml.
         run: |
+          previous=$(uv run cz version --project)
           set +e
-          uv run cz bump --yes --changelog
+          uv run cz bump --yes --changelog --files-only
           code=$?
           set -e
           # 21 is commitizen's "no eligible commits". Not a failure: it means the commits
@@ -64,18 +69,26 @@ jobs:
             exit "$code"
           fi
           version=$(uv run cz version --project)
+          uv lock
           echo "released=true" >> "$GITHUB_OUTPUT"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Bumped to $version"
+          echo "Bumping $previous to $version"
 
-      - name: Push the bump commit and its tag
+      - name: Commit, tag and push
         if: steps.bump.outputs.released == 'true'
-        # The tag is pushed by name rather than with --follow-tags. That flag only pushes
-        # annotated tags, and it silently succeeds when there is nothing to push — so a
-        # lightweight tag stays local while the step goes green and the release never runs.
+        # The tag is pushed by name rather than with --follow-tags: that flag pushes only
+        # annotated tags and exits zero having pushed nothing, so a missing tag looks like
+        # a green step while the release never runs.
+        env:
+          PREVIOUS: ${{ steps.bump.outputs.previous }}
+          VERSION: ${{ steps.bump.outputs.version }}
         run: |
+          git add pyproject.toml uv.lock CHANGELOG.md
+          git commit -m "bump: version $PREVIOUS → $VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
           git push origin main
-          git push origin "v${{ steps.bump.outputs.version }}"
+          git push origin "v$VERSION"
 
       - name: Hand off to the release workflow
         if: steps.bump.outputs.released == 'true'
