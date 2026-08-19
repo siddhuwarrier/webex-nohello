@@ -1,5 +1,10 @@
 # webex-nohello
 
+[![CI](https://github.com/siddhuwarrier/webex-nohello/actions/workflows/ci.yml/badge.svg)](https://github.com/siddhuwarrier/webex-nohello/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/webex-nohello)](https://pypi.org/project/webex-nohello/)
+[![Python](https://img.shields.io/pypi/pyversions/webex-nohello)](https://pypi.org/project/webex-nohello/)
+[![Licence](https://img.shields.io/pypi/l/webex-nohello)](LICENSE)
+
 Replies to content-free Webex greetings with a polite nudge towards
 [nohello.net](https://nohello.net/en/).
 
@@ -20,10 +25,8 @@ From nothing to a working schedule. **Every step but the last two is safe** — 
 to anyone until you both name them in the config *and* pass `--commit`.
 
 ```sh
-# 1. Install. Needs uv and Python 3.12+, plus `claude` or `codex` installed and signed in.
-git clone https://github.com/siddhuwarrier/webex-nohello
-cd webex-nohello
-uv tool install --editable .
+# 1. Install. Needs Python 3.12+, plus `claude` or `codex` installed and signed in.
+uv tool install webex-nohello        # or: pipx install webex-nohello
 
 # 2. Sign in. Walks you through registering a Webex integration of your own -- a couple of
 #    minutes, once -- then stores the tokens in your keychain and writes a starter config.
@@ -75,20 +78,17 @@ section, make it [Safety](#safety).
   [Which CLI does the classifying](#which-cli-does-the-classifying) for the difference.
 - A Webex account. You will register a personal integration during `auth login`.
 
-### From source
-
-Not published yet, so this is currently the only way in. You need
-[uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.12+.
+### From PyPI
 
 ```sh
-git clone https://github.com/siddhuwarrier/webex-nohello
-cd webex-nohello
-uv tool install --editable .
+uv tool install webex-nohello
+# or
+pipx install webex-nohello
 ```
 
-That puts `webex-nohello` on your `PATH` (usually `~/.local/bin`) in its own isolated
-environment, while still pointing at this working copy — so edits take effect without
-reinstalling. Drop `--editable` if you would rather have a fixed snapshot.
+Either gives you an isolated environment and a stable path on `PATH`, which is what makes the
+scheduled run reliable: launchd and cron are handed an absolute path, with no dependency on
+your shell profile or an activated virtualenv.
 
 Check it worked:
 
@@ -99,50 +99,23 @@ which webex-nohello
 
 To remove it: `uv tool uninstall webex-nohello`.
 
-If you only want to work on the code and never need the command outside this
-directory, skip the install entirely and prefix everything with `uv run` — see
-[Development](#development).
+### From source
 
-### Once published
-
-```sh
-uv tool install webex-nohello
-# or
-pipx install webex-nohello
-```
-
-Either way you get an isolated environment and a stable path on `PATH`, which is what
-makes the scheduled run reliable: launchd and cron are handed an absolute path, with no
-dependency on your shell profile or an activated virtualenv.
-
-## Sign in
+For working on it, or to run an unreleased change. You need
+[uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```sh
-webex-nohello auth login
+git clone https://github.com/siddhuwarrier/webex-nohello
+cd webex-nohello
+uv tool install --editable .
 ```
 
-Webex will not hand a command-line tool credentials until you have registered an
-integration of your own. The command walks you through it, printing every value
-you need to paste. Takes a couple of minutes, once.
+`--editable` keeps the installed command pointing at your working copy, so edits take effect
+without reinstalling. Note that scheduling an editable install pins the path of that working
+copy — move or delete it and the schedule breaks.
 
-```sh
-webex-nohello auth status    # confirms with Webex that the credentials work
-webex-nohello auth refresh   # force a token refresh now, and verify the result
-webex-nohello auth logout    # delete the stored credentials
-```
-
-`auth status` makes a real call rather than trusting the stored record, and exits
-non-zero if anything is wrong, so it is safe to gate a script on.
-
-You should not need `auth refresh`: any command that talks to Webex refreshes the
-access token itself once it nears expiry. It is there to exercise that path on
-demand, and to extend the refresh token's 90-day window if the tool has sat unused.
-
-If something else already owns the default callback port, use
-`auth login --port 9123` and set the same port in the integration's redirect URI.
-
-On success, `auth login` also writes a starter `config.toml` and tells you which CLI will be
-judging your messages.
+If you only want to work on the code and never need the command outside the directory, skip
+the install and prefix everything with `uv run` — see [Development](#development).
 
 ## Which CLI does the classifying
 
@@ -436,9 +409,31 @@ Dependencies live in `pyproject.toml` and are pinned in `uv.lock`. There is no
 `requirements.txt`. Adding a runtime dependency needs a one-line justification in
 the pull request, per Article II.11.
 
+## Releasing
+
+Tag it, and GitHub Actions does the rest via
+[trusted publishing](https://docs.pypi.org/trusted-publishers/) — there is no API token
+stored anywhere.
+
+```sh
+# rehearse against TestPyPI first
+gh workflow run release.yml -f target=testpypi
+
+# release
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Three gates before anything reaches PyPI:
+
+1. The same checks as CI, run again — a tag can be pushed to a commit CI never saw.
+2. The tag must match `version` in `pyproject.toml`. PyPI will not let a wrong version be
+   replaced, so this is the one mistake with no undo.
+3. The `pypi` GitHub environment. Add a required reviewer to it and you are asked to approve
+   before the release goes out.
+
 ## Status
 
-Early. Implemented so far:
+Implemented so far:
 
 | Command | State |
 | --- | --- |
