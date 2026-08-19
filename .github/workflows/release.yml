@@ -1,0 +1,99 @@
+name: Release
+
+# Publishes to PyPI via trusted publishing (OIDC), so there is no API token stored anywhere.
+#
+# Push a tag to release:
+#     git tag v0.1.0 && git push origin v0.1.0
+#
+# Or use "Run workflow" to publish a test build to TestPyPI first.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        type: choice
+        default: testpypi
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    # A release must not publish code that has not passed the same checks as a commit.
+    # Duplicated from ci.yml deliberately: a tag can be pushed to a commit CI never ran on.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --locked --all-extras --dev
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy
+      - run: uv run pytest -q
+      - run: uv run python scripts/check_module_length.py $(git ls-files '*.py')
+
+  build:
+    needs: gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Check the tag matches the version in pyproject.toml
+        # A tag that disagrees with the metadata publishes a version nobody asked for, and
+        # PyPI will not let it be replaced afterwards.
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tagged="${GITHUB_REF#refs/tags/v}"
+          declared=$(uv run python -c \
+            "import tomllib,pathlib; \
+             print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          if [ "$tagged" != "$declared" ]; then
+            echo "::error::tag v$tagged does not match pyproject version $declared"
+            exit 1
+          fi
+          echo "tag and version agree: $declared"
+
+      - run: uv build
+      - name: Check the metadata renders on PyPI
+        run: uvx twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment is the approval gate: a release is irreversible, since PyPI does not
+    # allow a version to be replaced. Configure a required reviewer on it to be asked first.
+    environment:
+      name: ${{ (github.event_name == 'workflow_dispatch' && inputs.target) || 'pypi' }}
+      url: https://pypi.org/project/webex-nohello/
+    permissions:
+      # The whole point of trusted publishing: GitHub mints a short-lived token for PyPI,
+      # and no long-lived secret exists to be stolen.
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: github.event_name != 'workflow_dispatch' || inputs.target == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
