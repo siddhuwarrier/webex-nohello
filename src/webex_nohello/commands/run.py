@@ -108,6 +108,9 @@ def run(
     )
     template = load_template(paths.reply_template_file())
 
+    # Marks where this run begins in the log. Does nothing interactively.
+    ui.run_separator("run --commit" if commit else "run (dry)")
+
     if is_paused(paths.paused_file()):
         ui.warn("Paused. Nothing will be read or sent.")
         ui.indented(f"Remove {paths.paused_file()} to resume.")

@@ -370,6 +370,19 @@ Output goes to `run.log` in the state directory:
 tail -f ~/"Library/Application Support/webex-nohello/run.log"
 ```
 
+Every line in that file is timestamped, and each run is preceded by a separator, so a log of
+many runs stays readable:
+
+```
+==================== run --commit at 2026-08-19 14:25:24+0100 ====================
+2026-08-19 14:25:24+0100  Signed in as Someone <someone@example.com>
+2026-08-19 14:25:24+0100  Reading direct spaces active since 2026-08-19 14:15...
+2026-08-19 14:25:31+0100  Examined 3 direct spaces.
+```
+
+Timestamps appear only when output is redirected. Interactively they would be noise, and you
+get colour instead.
+
 Note cron cannot express every interval: below an hour it must divide 60 (5, 10, 15, 20,
 30), and above an hour it must be a whole number of hours. Anything else is refused rather
 than quietly rounded.
